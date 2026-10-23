@@ -1,0 +1,89 @@
+import java.net.*;
+import java.io.*;
+import java.util.Date;
+
+public class ServerThread {
+    public static void main(String[] args) {
+        int port = 12345;
+        try {
+            ServerSocket serverSocket = new ServerSocket(port);
+            System.out.println("伺服器已啟動，正在監聽 Port " + port + "...");
+
+            // 伺服器主迴圈，持續等待新的連線
+            while (true) {
+                Socket clientSocket = serverSocket.accept();
+                System.out.println("有客戶端連入: " + clientSocket.getInetAddress());
+
+                // 為每個客戶端建立獨立執行緒，避免阻塞主程式
+                ClientHandler handler = new ClientHandler(clientSocket);
+                handler.start(); 
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+// 處理單一客戶端請求的執行緒
+class ClientHandler extends Thread {
+    private Socket socket;
+
+    public ClientHandler(Socket socket) {
+        this.socket = socket;
+    }
+
+    @Override
+    public void run() {
+        try {
+            DataInputStream in = new DataInputStream(socket.getInputStream());
+            DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+
+            // 產生 0~9 的隨機數字作為題目
+            int num1 = (int) (Math.random() * 10);
+            int num2 = (int) (Math.random() * 10);
+
+            // 把數字傳給客戶端，並記錄當下時間
+            out.writeInt(num1);
+            out.writeInt(num2);
+            out.flush();
+            long startTime = new java.util.Date().getTime();
+
+            // 等待接收客戶端算出的答案，並記錄結束時間
+            int clientAnswer = in.readInt();
+            long endTime = new java.util.Date().getTime();
+            
+            // 計算花了多少時間（毫秒）
+            long timeTaken = endTime - startTime;
+            int sum = num1 + num2;
+            String response = "";
+
+            // 判斷答案對錯以及有沒有超時（5秒）
+            if (clientAnswer == sum) {
+                if (timeTaken <= 5000) {
+                    response = "correct";
+                } else {
+                    response = "correct but too late";
+                }
+            } else {
+                if (timeTaken <= 5000) {
+                    response = "incorrect";
+                } else {
+                    response = "incorrect and too late";
+                }
+            }
+
+            // 將結果回傳給客戶端
+            out.writeUTF(response);
+            out.flush();
+
+            // 關閉資源
+            in.close();
+            out.close();
+            socket.close();
+            System.out.println("客戶端連線已關閉。");
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
